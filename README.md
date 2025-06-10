@@ -151,12 +151,6 @@ To add a new check:
 2. Follow the existing pattern for check functions
 3. Make sure your function returns findings in the standard format
 
-### Running Tests
-
-```bash
-# To be implemented
-```
-
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
