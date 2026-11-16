@@ -1,13 +1,13 @@
-from flask import Flask, request, jsonify
+import os
+
+from flask import Flask
 from flask_cors import CORS
 from scans import bp
 app = Flask(__name__)
-CORS(app) 
+# The API receives AWS credentials: only accept calls from the local React app.
+CORS(app, origins=[os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")])
+os.makedirs('scans', exist_ok=True)
 app.register_blueprint(bp, url_prefix='/scans')
-@app.route('/api/run-audit', methods=['POST'])
-def run_audit():
-    data = request.json
-    return jsonify({"message": "Audit completed", "data": data})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host="127.0.0.1", debug=os.getenv("FLASK_DEBUG") == "1")

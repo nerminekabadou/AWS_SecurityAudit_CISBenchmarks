@@ -4,3 +4,4 @@ webinterface/frontend/node_modules/
 webinterface/backend/venv/
 venv/
 webinterface/backend/scans/
+.pytest_cache/

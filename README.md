@@ -1,162 +1,90 @@
-# CIS_Benchmark
-usage:
-"pip install -e . "
-then run this command "cis-audit --help"
+# awscan: AWS CIS Benchmark Audit
 
-# AWS CIS Benchmark Automation Tool
+[![tests](https://github.com/nerminekabadou/AWS_SecurityAudit_CISBenchmarks/actions/workflows/tests.yml/badge.svg)](https://github.com/nerminekabadou/AWS_SecurityAudit_CISBenchmarks/actions/workflows/tests.yml)
 
-## Overview
+`awscan` checks an AWS account against controls from the **CIS AWS Foundations Benchmark** and reports every finding with its evidence and how to fix it. It runs as a command-line tool (table or JSON output) or as a small web app that keeps a history of scans and exports PDF reports.
 
-This project is an automated security assessment tool that evaluates AWS environments against the Center for Internet Security (CIS) AWS Foundations Benchmark. It helps identify security misconfigurations and compliance issues in your AWS account by performing checks across multiple AWS services including IAM, S3, and EC2.
-
-## Features
-
-- **Multi-Service Assessment**: Detects and audits enabled AWS services (IAM, S3, EC2)
-- **Automated Discovery**: Automatically discovers which services are active in your AWS account
-- **Concurrent Processing**: Uses multi-threading to run checks efficiently
-- **Comprehensive Checks**: Implements key CIS benchmark controls for AWS services
-- **Remediation Guidance**: Provides actionable remediation steps for failed checks
-- **Flexible Output**: Supports different output formats (JSON, table)
-
-## Implemented CIS Benchmark Checks
-
-### IAM Checks
-### S3 Checks
-### EC2 Checks
-
-## Project Structure
+## How it works
 
 ```
-CIS_Benchmark/
-├── Cli/
-│   ├── __init__.py
-│   └── main.py              # Command-line interface entry point
-├── Core/
-│   ├── Checks/
-│   │   ├── __init__.py
-│   │   ├── ec2_audit.py     # EC2-specific checks
-│   │   ├── iam_audit.py     # IAM-specific checks
-│   │   └── s3_audit.py      # S3-specific checks
-│   ├── __init__.py
-│   ├── auth.py              # AWS authentication handling
-│   └── orchestrator.py      # Orchestrates the scanning process
-└── setup.py                 # Package installation configuration
+credentials ──▶ STS get-caller-identity (validation)
+            ──▶ service discovery: IAM and monitoring are always audited;
+                S3, EC2, EFS and RDS only if the account uses them
+            ──▶ audits run in parallel (thread pool), one module per service
+            ──▶ findings grouped by service ──▶ table | JSON | PDF report
 ```
 
-## Requirements
+Each check returns findings in the same shape: `check_id`, `status`, `resource`, `evidence`, `remediation`. If an audit module crashes, the error is reported as a finding instead of stopping the scan.
 
-- Python 3.6 or higher
-- AWS Account with appropriate read-only permissions
-- The following Python packages:
-  - boto3
-  - click
+## Implemented checks
 
-## Installation
+| Area | CIS controls |
+|------|--------------|
+| **IAM** | 1.1 avoid root account use · 1.2 MFA on root · 1.8 password length ≥ 14 · 1.9 password reuse prevention · 1.10 MFA for console users · 1.12 disable credentials unused for 45 days · 1.13 one active access key per user · 1.14 key rotation ≤ 90 days |
+| **S3** | 2.1.1 default encryption · 2.1.2 deny non-HTTPS requests · 2.1.3 block public access |
+| **RDS** | 2.2.x storage encryption, auto minor version upgrade, not publicly accessible |
+| **EFS** | 2.3.1 encryption at rest |
+| **EC2** | 2.7 default security group not in use · 2.13 no secrets in user data |
+| **Monitoring** | 4.1 alarm on unauthorized API calls |
+| **Logging** *(implemented, not yet enabled)* | 3.1–3.9 CloudTrail in all regions, log validation, AWS Config, KMS encryption and rotation, VPC flow logs, S3 object-level logging |
 
-### Option 1: Install from Source
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/YoussefSahnoun/CIS_Benchmark.git
-   cd CIS_Benchmark
-   ```
-
-2. Create and activate a virtual environment (optional but recommended):
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. Install the package in development mode:
-   ```bash
-   pip install -e .
-   ```
-
-### Option 2: Install via pip
+## Install
 
 ```bash
-pip install git+https://github.com/YoussefSahnoun/CIS_Benchmark.git
+git clone https://github.com/nerminekabadou/AWS_SecurityAudit_CISBenchmarks.git
+cd AWS_SecurityAudit_CISBenchmarks
+pip install -e .
 ```
 
 ## Usage
 
-### Running the tool
-
-If you're running from the cloned repository without installing:
 ```bash
-python Cli/main.py --access-key YOUR_ACCESS_KEY --secret-key YOUR_SECRET_KEY --session-token YOUR_SESSION_TOKEN --region us-east-1 --output json
+awscan --profile audit --region eu-west-1            # use an AWS CLI profile
+awscan --region us-east-1                            # default credential chain (env vars, SSO, instance role)
+awscan --profile audit --output json > report.json   # machine-readable output
 ```
-
-If you installed the package using either of the installation methods above:
-```bash
-cis-audit --access-key YOUR_ACCESS_KEY --secret-key YOUR_SECRET_KEY --session-token YOUR_SESSION_TOKEN --region us-east-1 --output json
-```
-
-### Command-line Options
 
 | Option | Description |
 |--------|-------------|
-| `--access-key` | Your AWS access key |
-| `--secret-key` | Your AWS secret key |
-| `--session-token` | Your AWS session token (if using temporary credentials) |
-| `--region` | AWS region to use for the assessment |
-| `--output` | Output format for results (`json` or `table`) |
+| `--profile` | AWS CLI profile. If no keys are given, the standard credential chain is used |
+| `--access-key`, `--secret-key`, `--session-token` | Explicit credentials. The secret is prompted securely if it's not passed |
+| `--region` | Region to audit (default `us-east-1`) |
+| `--output` | `table` (default) or `json`. In JSON mode only the report goes to stdout |
 
-## Required AWS Permissions
+**Required permissions:** the AWS-managed `SecurityAudit` policy (read-only) covers all checks.
 
-To run all checks, the tool requires the following minimum AWS permissions:
+## Web interface
 
-```json
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "iam:GetAccountSummary",
-                "iam:GetAccountPasswordPolicy",
-                "iam:ListUsers",
-                "iam:ListAccessKeys",
-                "iam:GetAccessKeyLastUsed",
-                "iam:GetLoginProfile",
-                "iam:ListMFADevices",
-                "s3:ListAllMyBuckets",
-                "s3:GetBucketEncryption",
-                "s3:GetPublicAccessBlock",
-                "ec2:DescribeInstances",
-                "ec2:DescribeVpcs",
-                "ec2:DescribeSecurityGroups",
-                "ec2:DescribeInstanceAttribute"
-            ],
-            "Resource": "*"
-        }
-    ]
-}
+A React dashboard with a Flask API that runs scans, keeps a scan history and generates PDF reports (ReportLab).
+
+```bash
+pip install -e . -r webinterface/backend/requirements.txt
+cd webinterface/frontend && npm install && npm start      # http://localhost:3000
+cd webinterface/backend && flask --app app run             # http://localhost:5000
 ```
 
-## How It Works
+On Windows, `webinterface/build.ps1` starts both. The API is meant to run locally: it listens on `127.0.0.1` and only accepts requests from the local frontend.
 
-1. The tool validates your AWS credentials
-2. It discovers which AWS services are enabled in your account
-3. For each enabled service, it runs the relevant CIS benchmark checks
-4. Results are consolidated and output in your chosen format
+## Project structure
 
-## Development
+```
+Cli/main.py              awscan command (click)
+Core/auth.py             credential validation (STS)
+Core/orchestrator.py     service discovery and parallel audit execution
+Core/Checks/*_audit.py   one module per service, one function per CIS control
+webinterface/            Flask API + React dashboard, PDF reports
+tests/                   unit tests (no AWS account needed)
+```
 
-### Adding New Checks
+### Adding a check
+Add a `check_cis_x_y(session)` function to the right module in `Core/Checks/` that returns a list of findings, and call it from that module's `run_audit(session)`.
 
-To add a new check:
+## Tests
 
-1. Add your check function to the appropriate service file in `Core/Checks/`
-2. Follow the existing pattern for check functions
-3. Make sure your function returns findings in the standard format
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## Team
+Team project. Nermine Kabadou ([@nerminekabadou](https://github.com/nerminekabadou)) wrote the IAM, S3, RDS, EFS and logging checks and the credential validation, together with Youssef Sahnoun, Achref Messai and Aziza Nagara.
